@@ -14,7 +14,7 @@ type PortalClass = {
 	updateA: (self: Portal, cframe: CFrame, noCollide: { BasePart }) -> nil,
 	updateB: (self: Portal, cframe: CFrame, noCollide: { BasePart }) -> nil,
 	__index: PortalClass,
-	updateCollisions: (self: Portal) -> nil,
+	updateCollisions: (self: Portal, isPortalA: boolean) -> nil,
 }
 
 local LIGHT_COLOR = Color3.new(1, 1, 1)
@@ -97,204 +97,105 @@ function Portal:updateScene(scene: Model)
 	return nil
 end
 
-function Portal:updateCollisions()
+function Portal:updateCollisions(isPortalA: boolean)
 	--Collision for portal A
 	local char = game.Players.LocalPlayer.Character
 
-	local useViewportGhosts = false
+	local newParts = game.Workspace:GetPartsInPart((isPortalA and self.portalA or self.portalB).Hitbox)
+	local newTracker = {}
 
-	do
-		local newParts = game.Workspace:GetPartsInPart(self.portalA.Hitbox)
-		local newTracker = {}
+	local foundChar = false
 
-		local foundChar = false
-
-		for _, part in pairs(newParts) do
-			if part.Anchored then
-				continue
-			end
-			if char and part:IsDescendantOf(char) then
-				foundChar = true
-			end
-			newTracker[part] = true
-			if not self.noCollisionContraintsA[part] then
-				--NewPartAction
-				self.noCollisionContraintsA[part] = { Constraints = {} }
-				for i, noCollide in pairs(self.noCollideA) do
-					local constraint = Instance.new("NoCollisionConstraint")
-					constraint.Part0 = part
-					constraint.Part1 = noCollide
-					constraint.Parent = part
-					self.noCollisionContraintsA[part].Constraints[i] = constraint
-				end
-				if not (char and part:IsDescendantOf(char)) and part.Name ~= "Handle" then
-					local ghostPart = part:Clone()
-					ghostPart.CFrame = (self.cframeB * CFrame.fromEulerAnglesYXZ(0, math.pi, 0)):ToWorldSpace(
-						self.cframeA:ToObjectSpace(part.CFrame)
-					)
-					ghostPart.CanTouch = false
-					ghostPart.CanQuery = false
-					ghostPart.CanCollide = false
-					ghostPart.Anchored = true
-					ghostPart.Parent = self.portalB.Illusion
-					self.noCollisionContraintsA[part].ghostPart = ghostPart
-				end
-			else
-				--UpdatePartAction
-				local ghostPart = self.noCollisionContraintsA[part].ghostPart
-				if ghostPart then
-					ghostPart.CFrame = (self.cframeB * CFrame.fromEulerAnglesYXZ(0, math.pi, 0)):ToWorldSpace(
-						self.cframeA:ToObjectSpace(part.CFrame)
-					)
-				end
-			end
+	for _, part in pairs(newParts) do
+		if part.Anchored then
+			continue
 		end
-
-		for part, _ in pairs(self.noCollisionContraintsA) do
-			if not newTracker[part] then
-				--RemoveAction
-				for _, constraint in pairs(self.noCollisionContraintsA[part].Constraints) do
-					constraint:Destroy()
-				end
-				if self.noCollisionContraintsA[part].ghostPart then
-					self.noCollisionContraintsA[part].ghostPart:Destroy()
-				end
-				self.noCollisionContraintsA[part] = nil
-			end
+		if char and part:IsDescendantOf(char) then
+			foundChar = true
 		end
-
-		if foundChar and char then
-			useViewportGhosts = true
-			local ghostChar = self.portalB:FindFirstChild("Char")
-			if not ghostChar then
-				char.Archivable = true
-				ghostChar = char:Clone() :: Model
-				ghostChar.Name = "Char"
-				for _, v in pairs(ghostChar:GetChildren()) do
-					if v:IsA("BasePart") then
-						v.CanCollide = false
-						v.Anchored = true
-						v.CanTouch = false
-						v.CanQuery = false
-					end
-				end
-				ghostChar.Parent = self.portalB
+		newTracker[part] = true
+		local noCollisionConstraints = isPortalA and self.noCollisionContraintsA or self.noCollisionContraintsB
+		if not noCollisionConstraints[part] then
+			--NewPartAction
+			noCollisionConstraints[part] = { Constraints = {} }
+			for i, noCollide in pairs(isPortalA and self.noCollideA or self.noCollideB) do
+				local constraint = Instance.new("NoCollisionConstraint")
+				constraint.Part0 = part
+				constraint.Part1 = noCollide
+				constraint.Parent = part
+				noCollisionConstraints[part].Constraints[i] = constraint
 			end
-			local viewportChar = self.viewportWindowB.worldViewportFrame:FindFirstChild("Char")
-			if not viewportChar then
-				viewportChar = ghostChar:Clone()
-				viewportChar.Parent = self.viewportWindowB.worldViewportFrame
+			if not (char and part:IsDescendantOf(char)) and part.Name ~= "Handle" then
+				local ghostPart = part:Clone()
+				ghostPart.CFrame = (self.cframeB * CFrame.fromEulerAnglesYXZ(0, math.pi, 0)):ToWorldSpace(
+					self.cframeA:ToObjectSpace(part.CFrame)
+				)
+				ghostPart.CanTouch = false
+				ghostPart.CanQuery = false
+				ghostPart.CanCollide = false
+				ghostPart.Anchored = true
+				ghostPart.Parent = (isPortalA and self.portalB or self.portalA).Illusion
+				noCollisionConstraints[part].ghostPart = ghostPart
 			end
-			local otherSideCFrame = (self.cframeB * CFrame.fromEulerAnglesYXZ(0, math.pi, 0)):ToWorldSpace(
-				self.cframeA:ToObjectSpace(char.PrimaryPart.CFrame)
-			)
-			setCopy(char, ghostChar, otherSideCFrame)
-			setCopy(char, viewportChar, char:GetPivot())
-
-			ghostChar.Parent = self.portalB
-		elseif self.portalB:FindFirstChild("Char") then
-			self.portalB:FindFirstChild("Char"):Destroy()
-		elseif self.viewportWindowB.worldViewportFrame:FindFirstChild("Char") then
-			self.viewportWindowB.worldViewportFrame:FindFirstChild("Char"):Destroy()
+		else
+			--UpdatePartAction
+			local ghostPart = noCollisionConstraints[part].ghostPart
+			if ghostPart then
+				ghostPart.CFrame = ((isPortalA and self.cframeB or self.cframeA) * CFrame.fromEulerAnglesYXZ(
+					0,
+					math.pi,
+					0
+				)):ToWorldSpace((isPortalA and self.cframeA or self.cframeB):ToObjectSpace(part.CFrame))
+			end
 		end
 	end
 
-	--Collision for portal B
-	do
-		local newParts = game.Workspace:GetPartsInPart(self.portalB.Hitbox)
-		local newTracker = {}
-
-		local foundChar = false
-
-		for _, part in pairs(newParts) do
-			if part.Anchored then
-				continue
+	for part, _ in pairs(self.noCollisionContraintsA) do
+		if not newTracker[part] then
+			--RemoveAction
+			for _, constraint in pairs(self.noCollisionContraintsA[part].Constraints) do
+				constraint:Destroy()
 			end
-			if char and part:IsDescendantOf(char) then
-				foundChar = true
+			if self.noCollisionContraintsA[part].ghostPart then
+				self.noCollisionContraintsA[part].ghostPart:Destroy()
 			end
-			newTracker[part] = true
-			if not self.noCollisionContraintsB[part] then
-				--NewPartAction
-				self.noCollisionContraintsB[part] = { Constraints = {} }
-				for i, noCollide in pairs(self.noCollideB) do
-					local constraint = Instance.new("NoCollisionConstraint")
-					constraint.Part0 = part
-					constraint.Part1 = noCollide
-					constraint.Parent = part
-					self.noCollisionContraintsB[part].Constraints[i] = constraint
-				end
-				if not (char and part:IsDescendantOf(char)) and part.Name ~= "Handle" then
-					local ghostPart = part:Clone()
-					ghostPart.CFrame = (self.cframeA * CFrame.fromEulerAnglesYXZ(0, math.pi, 0)):ToWorldSpace(
-						self.cframeB:ToObjectSpace(part.CFrame)
-					)
-					ghostPart.CanTouch = false
-					ghostPart.CanQuery = false
-					ghostPart.CanCollide = false
-					ghostPart.Anchored = true
-					ghostPart.Parent = self.portalA.Illusion
-					self.noCollisionContraintsB[part].ghostPart = ghostPart
-				end
-			else
-				--UpdatePartAction
-				local ghostPart = self.noCollisionContraintsB[part].ghostPart
-				if ghostPart then
-					ghostPart.CFrame = (self.cframeA * CFrame.fromEulerAnglesYXZ(0, math.pi, 0)):ToWorldSpace(
-						self.cframeB:ToObjectSpace(part.CFrame)
-					)
-				end
-			end
+			self.noCollisionContraintsA[part] = nil
 		end
+	end
 
-		for part, _ in pairs(self.noCollisionContraintsB) do
-			if not newTracker[part] then
-				--RemoveAction
-				for _, constraint in pairs(self.noCollisionContraintsB[part].Constraints) do
-					constraint:Destroy()
+	if foundChar and char then
+		useViewportGhosts = true
+		local ghostChar = self.portalB:FindFirstChild("Char")
+		if not ghostChar then
+			char.Archivable = true
+			ghostChar = char:Clone() :: Model
+			ghostChar.Name = "Char"
+			for _, v in pairs(ghostChar:GetChildren()) do
+				if v:IsA("BasePart") then
+					v.CanCollide = false
+					v.Anchored = true
+					v.CanTouch = false
+					v.CanQuery = false
 				end
-				if self.noCollisionContraintsB[part].ghostPart then
-					self.noCollisionContraintsB[part].ghostPart:Destroy()
-				end
-				self.noCollisionContraintsB[part] = nil
 			end
+			ghostChar.Parent = self.portalB
 		end
-
-		if foundChar and char then
-			useViewportGhosts = true
-			local ghostChar = self.portalA:FindFirstChild("Char")
-			if not ghostChar then
-				char.Archivable = true
-				ghostChar = char:Clone() :: Model
-				ghostChar.Name = "Char"
-				for _, v in pairs(ghostChar:GetChildren()) do
-					if v:IsA("BasePart") then
-						v.CanCollide = false
-						v.Anchored = true
-						v.CanTouch = false
-						v.CanQuery = false
-					end
-				end
-				ghostChar.Parent = self.portalA
-			end
-			local viewportChar = self.viewportWindowA.worldViewportFrame:FindFirstChild("Char")
-			if not viewportChar then
-				viewportChar = ghostChar:Clone()
-				viewportChar.Parent = self.viewportWindowA.worldViewportFrame
-			end
-			local otherSideCFrame = (self.cframeA * CFrame.fromEulerAnglesYXZ(0, math.pi, 0)):ToWorldSpace(
-				self.cframeB:ToObjectSpace(char.PrimaryPart.CFrame)
-			)
-
-			setCopy(char, ghostChar, otherSideCFrame)
-			setCopy(char, viewportChar, char:GetPivot())
-
-			ghostChar.Parent = self.portalA
-		elseif self.portalA:FindFirstChild("Char") then
-			self.portalA:FindFirstChild("Char"):Destroy()
-		elseif self.viewportWindowA.worldViewportFrame:FindFirstChild("Char") then
-			self.viewportWindowA.worldViewportFrame:FindFirstChild("Char"):Destroy()
+		local viewportChar = self.viewportWindowB.worldViewportFrame:FindFirstChild("Char")
+		if not viewportChar then
+			viewportChar = ghostChar:Clone()
+			viewportChar.Parent = self.viewportWindowB.worldViewportFrame
 		end
+		local otherSideCFrame = (self.cframeB * CFrame.fromEulerAnglesYXZ(0, math.pi, 0)):ToWorldSpace(
+			self.cframeA:ToObjectSpace(char.PrimaryPart.CFrame)
+		)
+		setCopy(char, ghostChar, otherSideCFrame)
+		setCopy(char, viewportChar, char:GetPivot())
+
+		ghostChar.Parent = self.portalB
+	elseif self.portalB:FindFirstChild("Char") then
+		self.portalB:FindFirstChild("Char"):Destroy()
+	elseif self.viewportWindowB.worldViewportFrame:FindFirstChild("Char") then
+		self.viewportWindowB.worldViewportFrame:FindFirstChild("Char"):Destroy()
 	end
 
 	return nil
