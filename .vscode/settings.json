@@ -1,0 +1,8 @@
+{
+    "[lua]": {
+        "editor.defaultFormatter": "JohnnyMorganz.luau-lsp",
+        "editor.formatOnSave": true,
+    },
+    "stylua.targetReleaseVersion": "latest",
+    "editor.formatOnSave": true,
+}
