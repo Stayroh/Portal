@@ -188,18 +188,14 @@ function Portal:updateCollisions()
 			local otherSideCFrame = (self.cframeB * CFrame.fromEulerAnglesYXZ(0, math.pi, 0)):ToWorldSpace(
 				self.cframeA:ToObjectSpace(char.PrimaryPart.CFrame)
 			)
-			local ghostViewportChar = self.viewportWindowA.worldViewportFrame:FindFirstChild("Char")
-			if not ghostViewportChar then
-				ghostViewportChar = ghostChar:Clone()
-				ghostViewportChar.Parent = self.viewportWindowA.worldViewportFrame
-			end
 			setCopy(char, ghostChar, otherSideCFrame)
-			setCopy(char, ghostViewportChar, otherSideCFrame)
 			setCopy(char, viewportChar, char:GetPivot())
 
 			ghostChar.Parent = self.portalB
 		elseif self.portalB:FindFirstChild("Char") then
 			self.portalB:FindFirstChild("Char"):Destroy()
+		elseif self.viewportWindowB.worldViewportFrame:FindFirstChild("Char") then
+			self.viewportWindowB.worldViewportFrame:FindFirstChild("Char"):Destroy()
 		end
 	end
 
@@ -289,27 +285,15 @@ function Portal:updateCollisions()
 			local otherSideCFrame = (self.cframeA * CFrame.fromEulerAnglesYXZ(0, math.pi, 0)):ToWorldSpace(
 				self.cframeB:ToObjectSpace(char.PrimaryPart.CFrame)
 			)
-			local ghostViewportChar = self.viewportWindowB.worldViewportFrame:FindFirstChild("Char")
-			if not ghostViewportChar then
-				ghostViewportChar = ghostChar:Clone()
-				ghostViewportChar.Parent = self.viewportWindowB.worldViewportFrame
-			end
+
 			setCopy(char, ghostChar, otherSideCFrame)
-			setCopy(char, ghostViewportChar, otherSideCFrame)
 			setCopy(char, viewportChar, char:GetPivot())
 
 			ghostChar.Parent = self.portalA
 		elseif self.portalA:FindFirstChild("Char") then
 			self.portalA:FindFirstChild("Char"):Destroy()
-		end
-	end
-
-	if not useViewportGhosts then
-		if self.viewportWindowA.worldViewportFrame:FindFirstChild("Char") then
+		elseif self.viewportWindowA.worldViewportFrame:FindFirstChild("Char") then
 			self.viewportWindowA.worldViewportFrame:FindFirstChild("Char"):Destroy()
-		end
-		if self.viewportWindowB.worldViewportFrame:FindFirstChild("Char") then
-			self.viewportWindowB.worldViewportFrame:FindFirstChild("Char"):Destroy()
 		end
 	end
 

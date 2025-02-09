@@ -2,13 +2,26 @@ local Portal = require(game.ReplicatedStorage.Shared.Portal)
 local Player = game.Players.LocalPlayer
 local Mouse = Player:GetMouse()
 
+task.wait(2)
+
+local params = RaycastParams.new()
+params.FilterType = Enum.RaycastFilterType.Include
+local whitelist = {}
+for _, v in pairs(game:GetService("CollectionService"):GetTagged("PortalWall")) do
+	table.insert(whitelist, v)
+	print(v)
+end
+
+params.FilterDescendantsInstances = whitelist
+
 local function getClick(): (Vector3, Vector3, BasePart)
 	local hit
 	while not hit do
 		Mouse.Button1Down:wait()
 		local dir = Mouse.UnitRay.Direction
 		local pos = workspace.CurrentCamera.CFrame.Position
-		hit = workspace:Raycast(pos, dir * 1000)
+		hit = workspace:Raycast(pos, dir * 1000, params)
+		print(hit)
 	end
 	return hit.Position, hit.Normal, hit.Instance
 end
